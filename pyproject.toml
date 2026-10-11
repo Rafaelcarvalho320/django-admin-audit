@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "django-admin-audit"
+version = "0.1.0"
+description = "Record who changed what in the Django admin, with a before/after diff, and read it back in the admin itself."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Rafael Penço de Carvalho", email = "102534725+Rafaelcarvalho320@users.noreply.github.com" }]
+keywords = ["django", "admin", "audit", "audit-log", "history", "compliance"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+dependencies = ["Django>=4.2"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-django>=4.8",
+    "pytest-env>=1.1",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "django-stubs[compatible-mypy]>=5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Rafaelcarvalho320/django-admin-audit"
+Issues = "https://github.com/Rafaelcarvalho320/django-admin-audit/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/admin_audit"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+pythonpath = ["."]
+env = ["DJANGO_SECRET_KEY=test-only-key"]
+
+[tool.ruff]
+line-length = 88
+src = ["src", "tests"]
+target-version = "py310"
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "DJ"]
+ignore = ["RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["mypy_django_plugin.main"]
+files = ["src"]
+exclude = ["migrations"]
+
+[tool.django-stubs]
+django_settings_module = "tests.settings"

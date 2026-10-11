@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.10"
+            django: "4.2"
+          - python-version: "3.11"
+            django: "5.0"
+          - python-version: "3.12"
+            django: "5.1"
+          - python-version: "3.12"
+            django: "5.2"
+          - python-version: "3.13"
+            django: "5.2"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: |
+          pip install -e ".[dev]"
+          pip install "Django~=${{ matrix.django }}.0"
+
+      - name: Confirm the Django version under test
+        run: python -c "import django; print(django.get_version())"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Format check
+        run: ruff format --check .
+
+      - name: Test
+        run: pytest -q
+
+  types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: mypy
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Importing the package must not need Django to be set up
+        # A reusable app that touches models at import time raises
+        # AppRegistryNotReady the moment anything imports it before
+        # django.setup(), which makemigrations does. This is that regression.
+        run: |
+          pip install -e .
+          python -c "
+          import admin_audit
+          print('version', admin_audit.__version__)
+          print('lazy names', sorted(admin_audit.__all__)[:3], '...')
+          assert 'admin_audit.models' not in __import__('sys').modules, (
+              'importing the package pulled in models'
+          )
+          "
+
+      - name: The lazy names still resolve once Django is ready
+        run: |
+          pip install -e ".[dev]"
+          python -c "
+          import django
+          from django.conf import settings
+          settings.configure(
+              INSTALLED_APPS=['django.contrib.contenttypes', 'django.contrib.auth', 'admin_audit'],
+              DATABASES={'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}},
+          )
+          django.setup()
+          from admin_audit import AuditEntry, AuditedModelAdmin
+          print('resolved', AuditEntry.__name__, AuditedModelAdmin.__name__)
+          "
+
+      - name: Build the distribution
+        run: |
+          pip install build twine
+          python -m build
+          twine check dist/*
